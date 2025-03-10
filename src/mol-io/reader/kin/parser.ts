@@ -6,11 +6,11 @@
 
 import { ReaderResult as Result } from '../result';
 import { Task, RuntimeContext } from '../../../mol-task';
-import { Kinemage } from './schema';
+import { KinemageData } from './schema';
 import KinParser from './ngl-based-parser';
 
-async function parseInternal(data: string, ctx: RuntimeContext): Promise<Result<Kinemage[]>> {
-  const kinemages: Kinemage[] = [];
+async function parseInternal(data: string, ctx: RuntimeContext): Promise<Result<KinemageData[]>> {
+  const kinemages: KinemageData[] = [];
     // Split the data into sections based on the '@kinemage' keyword, which indicates one or more kinemages in the file.
     // Handle the case where there is no '@kinemage' keyword by parsing the entire file.
     const kinemageSections = data.split(/@kinemage\s+\d+/); // Split based on '@kinemage' keyword followed by a number
@@ -35,7 +35,7 @@ async function parseInternal(data: string, ctx: RuntimeContext): Promise<Result<
 }
 
 export function parseKin(data: string) {
-    return Task.create<Result<Kinemage[]>>('Parse KIN', async ctx => {
+    return Task.create<Result<KinemageData[]>>('Parse KIN', async ctx => {
         return await parseInternal(data, ctx);
     });
 }

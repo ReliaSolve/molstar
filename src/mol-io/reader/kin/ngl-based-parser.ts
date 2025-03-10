@@ -17,7 +17,7 @@
 
 /// @todo Fill in commments
 
-import { Kinemage, RibbonObject } from './schema';
+import { KinemageData, RibbonObject } from './schema';
 
 function hsvToRgb (h: number, s: number, v: number) {
   h /= 360
@@ -305,7 +305,7 @@ function removePointBreaksTriangleArrays (convertedRibbonObject: RibbonObject) {
 
 class KinParser {
   /// @brief Property that is filled in by the constructor as it parses the file. Read by the caller.
-  kinemage: Kinemage
+  kinemage: KinemageData
 
   /// @brief Constructor for the KinParser class.
   /// @param data The string data to be parsed, including all lines in the file.
@@ -316,7 +316,7 @@ class KinParser {
   private _parse (data: string) {
     // http://kinemage.biochem.duke.edu/software/king.php
 
-    const kinemage: Kinemage = {
+    const kinemage: KinemageData = {
       comments: [],
       kinemage: undefined,
       onewidth: undefined,

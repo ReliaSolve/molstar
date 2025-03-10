@@ -4,7 +4,7 @@
  * @author ReliaSolve <russ@reliasolve.com>
  */
 
-export interface Kinemage {
+export interface KinemageData {
   readonly comments: ReadonlyArray<string>
   kinemage?: number,
   onewidth?: any,

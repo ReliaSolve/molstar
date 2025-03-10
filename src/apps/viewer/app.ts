@@ -22,6 +22,7 @@ import { loadMVS, MolstarLoadingExtension } from '../../extensions/mvs/load';
 import { MVSData } from '../../extensions/mvs/mvs-data';
 import { PDBeStructureQualityReport } from '../../extensions/pdbe';
 import { RCSBValidationReport } from '../../extensions/rcsb';
+import { Kinemage } from '../../extensions/kinemage/behavior';
 import { AssemblySymmetry, AssemblySymmetryConfig } from '../../extensions/assembly-symmetry';
 import { SbNcbrPartialCharges, SbNcbrPartialChargesPreset, SbNcbrPartialChargesPropertyProvider, SbNcbrTunnels } from '../../extensions/sb-ncbr';
 import { Volseg, VolsegVolumeServerConfig } from '../../extensions/volumes-and-segmentations';
@@ -73,6 +74,7 @@ export const ExtensionMap = {
     'pdbe-structure-quality-report': PluginSpec.Behavior(PDBeStructureQualityReport),
     'assembly-symmetry': PluginSpec.Behavior(AssemblySymmetry),
     'rcsb-validation-report': PluginSpec.Behavior(RCSBValidationReport),
+    'kinemage': PluginSpec.Behavior(Kinemage),
     'anvil-membrane-orientation': PluginSpec.Behavior(ANVILMembraneOrientation),
     'g3d': PluginSpec.Behavior(G3DFormat),
     'model-export': PluginSpec.Behavior(ModelExport),
