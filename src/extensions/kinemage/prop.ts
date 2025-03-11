@@ -52,7 +52,8 @@ namespace KinemageInfo {
       return result.result;
     }
 
-    export async function open(file: File, plugin: PluginContext, previous: KinemageInfo | undefined): Promise<KinemageInfo> {
+    /// @todo Does this need to be a Promise<CustomProperty.Data<KinemageInfo>>?
+    export async function open(file: File, plugin: PluginContext): Promise<KinemageInfo> {
       if (file === null) throw new Error('No file given');
       const task = Task.create('Load KIN file', async ctx => {
         const data = await file.text();
@@ -60,13 +61,8 @@ namespace KinemageInfo {
         return kinData;
       });
       const kinData = await plugin.runTask(task);
-
-      // If we have a previous KinemageInfo, we need to merge the new data with the old data
-      // and update the activeKinemage index
-      let kins = previous ? previous.kinemages : [];
-      kins = kins.concat(kinData);
-      const activeKinemage = kins.length - 1;
-      return { kinemages:kins, activeKinemage };
+      const activeKinemage = kinData.length - 1;
+      return { kinemages:kinData, activeKinemage };
     }
 
 }

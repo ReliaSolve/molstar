@@ -27,8 +27,9 @@ import { ParamDefinition as PD } from '../../mol-util/param-definition';
 //import { LoadMvsData, MVSJFormatProvider, MVSXFormatProvider, loadMVSX } from './components/formats';
 //import { IsMVSModelProvider } from './components/is-mvs-model-prop';
 //import { makeMultilayerColorThemeProvider } from './components/multilayer-color-theme';
-import { parseKin } from '../../mol-io/reader/kin/parser';
-import { KinemageData } from '../../mol-io/reader/kin/schema';
+//import { parseKin } from '../../mol-io/reader/kin/parser';
+//import { KinemageData } from '../../mol-io/reader/kin/schema';
+import { KinemageInfo } from './prop';
 
 /** Collection of things that can be registered/unregistered in a plugin */
 interface Registerables {
@@ -85,7 +86,7 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
     };
 
     // Keep track of all of the KinemageData objects that have been loaded
-    private kinemageData: KinemageData[] = [];
+    //private kinemageInfo: KinemageInfo;
 
     register(): void {
       for (const prop of this.registerables.customModelProperties ?? []) {
@@ -156,15 +157,6 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
   })
 });
 
-async function loadKinemageData(data: string, plugin: PluginContext): Promise<KinemageData[]> {
-  const task = parseKin(data);
-  const result = await plugin.runTask(task);
-  if (result.isError) {
-    throw new Error('Failed to parse KIN data');
-  }
-  return result.result;
-}
-
 /** Registerable method for handling dragged-and-dropped files */
 interface DragAndDropHandler {
   name: string,
@@ -183,10 +175,9 @@ const KINDragAndDropHandler: DragAndDropHandler = {
     for (const file of files) {
       if (file.name.toLowerCase().endsWith('.kin')) {
         const task = Task.create('Load KIN file', async ctx => {
-          const data = await file.text();
           console.log('XXX loading KIN file ', file.name);  /// @todo Remove when done debugging
-          const kinData = await loadKinemageData(data, plugin);
-          console.log('XXX found kinData with size ', kinData.length);  /// @todo Remove when done debugging
+          const kinInfo = await KinemageInfo.open(file, plugin);
+          console.log('XXX the accumulated Kinemages size ', kinInfo.kinemages.length, ', active is ', kinInfo.activeKinemage);  /// @todo Remove when done debugging
           //await loadMVS(plugin, mvsData, { sanityChecks: true, replaceExisting: !applied, sourceUrl: undefined });
         });
         await plugin.runTask(task);
