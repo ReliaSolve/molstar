@@ -176,8 +176,8 @@ const KINDragAndDropHandler: DragAndDropHandler = {
       if (file.name.toLowerCase().endsWith('.kin')) {
         const task = Task.create('Load KIN file', async ctx => {
           console.log('XXX loading KIN file ', file.name);  /// @todo Remove when done debugging
-          const kinInfo = await KinemageInfo.open(file, plugin);
-          console.log('XXX the accumulated Kinemages size ', kinInfo.kinemages.length, ', active is ', kinInfo.activeKinemage);  /// @todo Remove when done debugging
+          const kinInfo = await KinemageInfo.open(file);
+          console.log('XXX the accumulated Kinemages size ', kinInfo.value.kinemages.length, ', active is ', kinInfo.value.activeKinemage);  /// @todo Remove when done debugging
           //await loadMVS(plugin, mvsData, { sanityChecks: true, replaceExisting: !applied, sourceUrl: undefined });
         });
         await plugin.runTask(task);
