@@ -82,7 +82,6 @@ namespace KinemageInfo {
       return result.result;
     }
 
-    /// @todo Does this need to be a Promise<CustomProperty.Data<KinemageInfo>>?
     export async function open(file: FileSourceProps | File): Promise<CustomProperty.Data<KinemageInfo>> {
 
       let fileToRead: File;
