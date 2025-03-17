@@ -29,7 +29,7 @@ import { ParamDefinition as PD } from '../../mol-util/param-definition';
 //import { makeMultilayerColorThemeProvider } from './components/multilayer-color-theme';
 //import { parseKin } from '../../mol-io/reader/kin/parser';
 //import { KinemageData } from '../../mol-io/reader/kin/schema';
-import { KinemageInfo, KinemageInfoProvider } from './prop';
+import { KinemageInfo } from './prop';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -57,7 +57,6 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
   ctor: class extends PluginBehavior.Handler<{ autoAttach: boolean }> {
     private readonly registerables: Registerables = {
       customModelProperties: [
-        KinemageInfoProvider,
         //IsMVSModelProvider,
         //MVSAnnotationsProvider,
       ],
@@ -181,11 +180,11 @@ const KINDragAndDropHandler: DragAndDropHandler = {
         const task = Task.create('Load KIN file', async ctx => {
           console.log('XXX loading KIN file ', file.name);  /// @todo Remove when done debugging
           const kinInfo = await KinemageInfo.open(file);
-          for (const kinData of kinInfo.value.kinemages) {
+          for (const kinData of kinInfo.kinemages) {
             g_kinemageInfo.kinemages.push(kinData);
             g_kinemageInfo.activeKinemage = g_kinemageInfo.kinemages.length - 1;
           }
-          console.log('XXX the accumulated Kinemages size ', g_kinemageInfo.kinemages.length, ', active is ', g_kinemageInfo.activeKinemage);  /// @todo Remove when done debugging
+          console.log('XXX accumulated Kinemages size ', g_kinemageInfo.kinemages.length, ', active is ', g_kinemageInfo.activeKinemage);  /// @todo Remove when done debugging
         });
         await plugin.runTask(task);
         applied = true;

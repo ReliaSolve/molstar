@@ -19,10 +19,10 @@
 //import { Type } from '../../../mol-script/language/type';
 //import { Asset } from '../../../mol-util/assets';
 //import { CustomPropertyDescriptor } from '../../../mol-model/custom-property';
-import { Model } from '../../mol-model/structure/model';
-import { CustomProperty } from '../../mol-model-props/common/custom-property';
-import { CustomPropertyDescriptor } from '../../mol-model/custom-property';
-import { CustomModelProperty } from '../../mol-model-props/common/custom-model-property';
+//import { Model } from '../../mol-model/structure/model';
+//import { CustomProperty } from '../../mol-model-props/common/custom-property';
+//import { CustomPropertyDescriptor } from '../../mol-model/custom-property';
+//import { CustomModelProperty } from '../../mol-model-props/common/custom-model-property';
 import { ParamDefinition as PD } from '../../mol-util/param-definition';
 import { Task } from '../../mol-task';
 //import { PluginContext } from '../../mol-plugin/context';
@@ -55,6 +55,7 @@ export type KinemageInfoParams = typeof KinemageInfoParams
 export type KinemageInfoProps = PD.Values<KinemageInfoParams>
 
 /** Provider for custom model property "KinemageInfo" */
+/*
 export const KinemageInfoProvider: CustomModelProperty.Provider<KinemageInfoParams, KinemageInfo> = CustomModelProperty.createProvider({
   label: 'Kinemage data',
   descriptor: CustomPropertyDescriptor({
@@ -69,7 +70,7 @@ export const KinemageInfoProvider: CustomModelProperty.Provider<KinemageInfoPara
     return await KinemageInfo.open(props.source);
   }
 });
-
+*/
 
 namespace KinemageInfo {
 
@@ -82,7 +83,7 @@ namespace KinemageInfo {
       return result.result;
     }
 
-    export async function open(file: FileSourceProps | File): Promise<CustomProperty.Data<KinemageInfo>> {
+    export async function open(file: FileSourceProps | File): Promise<KinemageInfo> {
 
       let fileToRead: File;
 
@@ -102,7 +103,7 @@ namespace KinemageInfo {
 
       const kinData = await task.run();
       const activeKinemage = kinData.length - 1;
-      return { value: { kinemages: kinData, activeKinemage } };
+      return { kinemages: kinData, activeKinemage };
     }
 
 }
