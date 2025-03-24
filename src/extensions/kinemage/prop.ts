@@ -41,6 +41,7 @@ interface KinemageInfo {
      * Index of the active KinemageData
      */
     activeKinemage: number
+
 }
 
 const FileSourceParams = {
@@ -73,6 +74,11 @@ export const KinemageInfoProvider: CustomModelProperty.Provider<KinemageInfoPara
 */
 
 namespace KinemageInfo {
+
+    export enum Tag {
+      Cluster = 'kinemage-cluster',
+      Representation = 'kinemage-3d'
+    }
 
     async function loadKinemageData(data: string): Promise<KinemageData[]> {
       const task = parseKin(data);

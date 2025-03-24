@@ -18,6 +18,7 @@ import { StateAction } from '../../mol-state';
 import { Task } from '../../mol-task';
 import { ColorTheme } from '../../mol-theme/color';
 import { ParamDefinition as PD } from '../../mol-util/param-definition';
+import { CollapsableControls } from '../../mol-plugin-ui/base';
 //import { MVSAnnotationColorThemeProvider } from './components/annotation-color-theme';
 //import { MVSAnnotationLabelRepresentationProvider } from './components/annotation-label/representation';
 //import { MVSAnnotationsProvider } from './components/annotation-prop';
@@ -30,6 +31,10 @@ import { ParamDefinition as PD } from '../../mol-util/param-definition';
 //import { parseKin } from '../../mol-io/reader/kin/parser';
 //import { KinemageData } from '../../mol-io/reader/kin/schema';
 import { KinemageInfo } from './prop';
+//import './ui';
+import { KinemageControls, Tag } from './ui';
+
+const Tag = KinemageInfo.Tag;
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -38,6 +43,7 @@ let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
 interface Registerables {
   customModelProperties?: CustomModelProperty.Provider<any, any>[],
   customStructureProperties?: CustomStructureProperty.Provider<any, any>[],
+  customStructureControls?: CollapsableControls[],
   representations?: StructureRepresentationProvider<any>[],
   colorThemes?: ColorTheme.Provider[],
   lociLabels?: LociLabelProvider[],
@@ -63,6 +69,9 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
       customStructureProperties: [
         //CustomTooltipsProvider,
         //MVSAnnotationTooltipsProvider,
+      ],
+      customStructureControls: [
+        KinemageControls,
       ],
       representations: [
         //CustomLabelRepresentationProvider,
@@ -97,6 +106,9 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
       }
       for (const prop of this.registerables.customStructureProperties ?? []) {
         this.ctx.customStructureProperties.register(prop, this.params.autoAttach);
+      }
+      for (const ctl of this.registerables.customStructureControls ?? []) {
+        this.ctx.customStructureControls.set(Tag.Representation, ctl);
       }
       for (const repr of this.registerables.representations ?? []) {
         this.ctx.representation.structure.registry.add(repr);
