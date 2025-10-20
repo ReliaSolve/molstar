@@ -6,6 +6,7 @@
  * Based on ../mvs/behavior.ts
  */
 
+import { KinemageData } from '../../mol-io/reader/kin/schema';
 import { CustomModelProperty } from '../../mol-model-props/common/custom-model-property';
 import { CustomStructureProperty } from '../../mol-model-props/common/custom-structure-property';
 import { DataFormatProvider } from '../../mol-plugin-state/formats/provider';
@@ -166,6 +167,27 @@ interface DragAndDropHandler {
   handle: PluginDragAndDropHandler,
 }
 
+/** Reproducing what loadMVS() did in the MVS function to try and get geometry drawn. */
+async function loadMVSClone(plugin: PluginContext, data: KinemageData) {
+  // This calls loadMolstartTree() after converting input data to a different format, parameter 'tree'\
+  // This calls loadTree(), passing it MolstartLoadingActions function as a parameter; loadTree() is from load-generic.ts
+  // This calls loadTreeInUpdate() passing the function as loadingActions, then calls UpdateTarget.commit(updateRoot)
+  // This calls loadingAction, passing it updateParent, node, context and then sets various maps to the returned node
+  // @todo It is not clear how this path ends up calling the primitives() method in MolstarLoadingActions
+  // ... and that is responsible for filling in the UpdateTarget-typed updateParent parameter.
+
+  // applyPrimitiveVisuals() updates its input UpdateTarget "data" parameter with the new ShapeRepresentation3D elements
+  // UpdateTarget is an interface defined in load-generic.ts that takes a PluginContext in its constructor and does the work
+  //    Its apply() method is what does the actual work of applying the changes to the plugin state using StateBuilder.Root
+  //    Its setMvsDependencies() method is as follows:
+  //      setMvsDependencies(target: UpdateTarget, refs: string[] | Set<string>): UpdateTarget {
+  //        refs.forEach(ref => target.mvsDependencyRefs.add(ref));
+  //        return target;
+  //      }
+  //    Here is what it sets:
+  //      readonly mvsDependencyRefs: Set<string>
+}
+
 /** DragAndDropHandler handler for `.kin` files */
 const KINDragAndDropHandler: DragAndDropHandler = {
   name: 'kin',
@@ -184,7 +206,8 @@ const KINDragAndDropHandler: DragAndDropHandler = {
             g_kinemageInfo.kinemages.push(kinData);
             g_kinemageInfo.activeKinemage = g_kinemageInfo.kinemages.length - 1;
           }
-          console.log('XXX accumulated Kinemages size ', g_kinemageInfo.kinemages.length, ', active is ', g_kinemageInfo.activeKinemage);  /// @todo Remove when done debugging
+          console.log('XXX accumulated Kinemages size ', g_kinemageInfo.kinemages.length, ', active is ', g_kinemageInfo.activeKinemage);
+          /// @todo See what loadMVS() ... LoadMolstarTree() ... MolstarLoadingActions().primitives() ... applyPrimitiveVisuals() does
         });
         await plugin.runTask(task);
         applied = true;
