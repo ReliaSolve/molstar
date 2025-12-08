@@ -254,15 +254,10 @@ const KINDragAndDropHandler: DragAndDropHandler = {
 
           console.log('XXX UpdateTarget.create()');
           // Build an update target and apply the representation transform
-          const updateRoot = UpdateTarget.create(plugin, /* ReplaceExisting @todo consider using true here */ false);
-
-          console.log('XXX structureTarget = UpdateTarget.apply()');
-          // create an empty structure node (uses existing registered transform)
-          const structureTarget = UpdateTarget.apply(
-            updateRoot,
-            StructureFromModel as any,
-            { type: { name: 'model', params: {} } }
-          );
+          const updateRoot = UpdateTarget.create(plugin, false);
+          const structureTarget = UpdateTarget.apply(updateRoot, StructureFromModel as any, { type: { name: 'model', params: {} } });
+          console.log('XXX updateRoot.selector', updateRoot.selector);
+          console.log('XXX structureTarget.selector', (structureTarget as any).selector);
 
           console.log('XXX UpdateTarget.apply()');
           // attach the Kinemage representation to the created structure node
@@ -272,14 +267,17 @@ const KINDragAndDropHandler: DragAndDropHandler = {
             data: shapeProvider
           });
 
+          const tree = updateRoot.update.getTree();
+          console.log('XXX tree root children:', tree.children.get(updateRoot.selector.ref));
           console.log('XXX UpdateTarget.commit()');
-          // single commit for the whole update
-          await UpdateTarget.commit(updateRoot);
+          await UpdateTarget.commit(updateRoot); // commit once
+          console.log('XXX After UpdateTarget.commit()');
         });
         await plugin.runTask(task);
         applied = true;
       }
     }
+    console.log('XXX KINDragAndDropHandler applied=', applied);
     return applied;
   },
 };
