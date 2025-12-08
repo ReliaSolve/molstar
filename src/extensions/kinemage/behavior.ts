@@ -22,11 +22,13 @@ import { ColorTheme } from '../../mol-theme/color';
 import { ParamDefinition as PD } from '../../mol-util/param-definition';
 import { KinRepresentationProvider } from './kin-repr';
 import { KinemageInfo } from './prop';
-import { shapeFromKin, KinData, KinShapeParams } from '../../mol-model-formats/shape/kin';
+import { shapeFromKin, KinData, KinShapeParams, createKinShapeParams } from '../../mol-model-formats/shape/kin';
 import { UpdateTarget } from '../mvs/load-generic';
 import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
 import { ShapeProvider } from '../../mol-model/shape/provider';
 import { Lines } from '../../mol-geo/geometry/lines/lines';
+import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
+//import { StateTransformer } from '../../mol-state';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -186,16 +188,41 @@ async function loadMVSClone(plugin: PluginContext, data: KinemageData) {
 }
 */
 
-// pseudo: a minimal transform that creates a node containing the shapeProvider
+/** Minimal holder transform descriptor — must include `isDecorator`. */
+/*
 const KinemageDataCreateTransform = {
   id: 'kinemage.data.create',
-  apply: (updateTarget: UpdateTarget, params: { data: ShapeProvider<KinData, Lines, KinShapeParams>, label?: string }) => {
-    // minimal holder transform: create a child node storing the ShapeProvider in state.
-    // Use an existing state transformer if available; this is just the type fix.
-    // Implementation omitted here — return an UpdateTarget created by applying a real transform.
-    return updateTarget;
+  display: { name: 'Create Kinemage Data' },
+
+  // 'action' provides the state builder (action.update / action.selector)
+  apply: (action: any, params: { data?: any, label?: string }) => {
+    // Reuse existing transformer to create a real child structure node.
+    const created = action.update.to(action.selector).apply(
+      StructureFromModel as any,
+      { type: { name: 'model', params: {} } }
+    );
+    return created.selector;
+  },
+
+  // this transform decorates existing state rather than replacing it
+  isDecorator: true,
+  // @todo Check if this should be true or false
+  isOptional: true
+} as unknown as StateTransformer;
+*/
+
+// Provide minimal params getter for Kinemage shapes.
+// Return params based on the currently active kinemage when available,
+// otherwise fall back to the generic KinShapeParams.
+// We don't call the async `shapeFromKin` here because getParams must be synchronous.
+function getKinShapeParams(): PD.Params {
+  const active = g_kinemageInfo.activeKinemage;
+  if (active !== -1) {
+    const kin = g_kinemageInfo.kinemages[active];
+    if (kin) return PD.clone(createKinShapeParams(kin) as any);
   }
-};
+  return PD.clone(KinShapeParams as any);
+}
 
 /** DragAndDropHandler handler for `.kin` files */
 const KINDragAndDropHandler: DragAndDropHandler = {
@@ -225,23 +252,29 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           const spTask = shapeFromKin(g_kinemageInfo.kinemages[g_kinemageInfo.activeKinemage], {});
           const shapeProvider = await spTask.runInContext(ctx) as ShapeProvider<KinData, Lines, KinShapeParams>;
 
-          console.log('XXX created ShapeProvider from KinemageData');
+          console.log('XXX UpdateTarget.create()');
           // Build an update target and apply the representation transform
           const updateRoot = UpdateTarget.create(plugin, /* ReplaceExisting @todo consider using true here */ false);
 
-          // apply the transform; UpdateTarget.apply will schedule the transformer for this update
-          console.log('XXX applying StructureRepresentation3D with KinRepresentationProvider');
-          const holderTarget = UpdateTarget.apply(updateRoot, KinemageDataCreateTransform as any, { data: shapeProvider });
-          UpdateTarget.apply(holderTarget, StructureRepresentation3D as any, {
+          console.log('XXX structureTarget = UpdateTarget.apply()');
+          // create an empty structure node (uses existing registered transform)
+          const structureTarget = UpdateTarget.apply(
+            updateRoot,
+            StructureFromModel as any,
+            { type: { name: 'model', params: {} } }
+          );
+
+          console.log('XXX UpdateTarget.apply()');
+          // attach the Kinemage representation to the created structure node
+          UpdateTarget.apply(structureTarget, StructureRepresentation3D as any, {
             type: KinRepresentationProvider,
-            params: PD.getDefaultValues(g_kinemageInfo.kinemages[g_kinemageInfo.activeKinemage] as any),
+            params: PD.getDefaultValues(getKinShapeParams() as any),
             data: shapeProvider
           });
 
-          // commit the update -> this will cause Mol* to call the provider factory
-          console.log('XXX committing update target');
+          console.log('XXX UpdateTarget.commit()');
+          // single commit for the whole update
           await UpdateTarget.commit(updateRoot);
-
         });
         await plugin.runTask(task);
         applied = true;

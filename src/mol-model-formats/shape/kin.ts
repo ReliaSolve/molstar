@@ -23,7 +23,7 @@ export type KinData = {
     transforms?: Mat4[],
 }
 
-function createKinShapeParams(kinemage?: KinemageData) {
+export function createKinShapeParams(kinemage?: KinemageData) {
 
     return {
         ...Lines.Params,
