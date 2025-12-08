@@ -6,7 +6,7 @@
  * Based on ../mvs/behavior.ts
  */
 
-import { KinemageData } from '../../mol-io/reader/kin/schema';
+//import { KinemageData } from '../../mol-io/reader/kin/schema';
 import { CustomModelProperty } from '../../mol-model-props/common/custom-model-property';
 import { CustomStructureProperty } from '../../mol-model-props/common/custom-structure-property';
 import { DataFormatProvider } from '../../mol-plugin-state/formats/provider';
@@ -14,23 +14,19 @@ import { PluginDragAndDropHandler } from '../../mol-plugin-state/manager/drag-an
 import { LociLabelProvider } from '../../mol-plugin-state/manager/loci-label';
 import { PluginBehavior } from '../../mol-plugin/behavior/behavior';
 import { PluginContext } from '../../mol-plugin/context';
+//import { Structure } from '../../mol-model/structure';
 import { StructureRepresentationProvider } from '../../mol-repr/structure/representation';
 import { StateAction } from '../../mol-state';
 import { Task } from '../../mol-task';
 import { ColorTheme } from '../../mol-theme/color';
 import { ParamDefinition as PD } from '../../mol-util/param-definition';
-//import { MVSAnnotationColorThemeProvider } from './components/annotation-color-theme';
-//import { MVSAnnotationLabelRepresentationProvider } from './components/annotation-label/representation';
-//import { MVSAnnotationsProvider } from './components/annotation-prop';
-//import { MVSAnnotationTooltipsLabelProvider, MVSAnnotationTooltipsProvider } from './components/annotation-tooltips-prop';
-//import { CustomLabelRepresentationProvider } from './components/custom-label/representation';
-//import { CustomTooltipsLabelProvider, CustomTooltipsProvider } from './components/custom-tooltips-prop';
-//import { LoadMvsData, MVSJFormatProvider, MVSXFormatProvider, loadMVSX } from './components/formats';
-//import { IsMVSModelProvider } from './components/is-mvs-model-prop';
-//import { makeMultilayerColorThemeProvider } from './components/multilayer-color-theme';
-//import { parseKin } from '../../mol-io/reader/kin/parser';
-//import { KinemageData } from '../../mol-io/reader/kin/schema';
+import { KinRepresentationProvider } from './kin-repr';
 import { KinemageInfo } from './prop';
+import { shapeFromKin, KinData, KinShapeParams } from '../../mol-model-formats/shape/kin';
+import { UpdateTarget } from '../mvs/load-generic';
+import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
+import { ShapeProvider } from '../../mol-model/shape/provider';
+import { Lines } from '../../mol-geo/geometry/lines/lines';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -66,6 +62,7 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
         //MVSAnnotationTooltipsProvider,
       ],
       representations: [
+        KinRepresentationProvider,
         //CustomLabelRepresentationProvider,
         //MVSAnnotationLabelRepresentationProvider,
       ],
@@ -167,7 +164,7 @@ interface DragAndDropHandler {
   handle: PluginDragAndDropHandler,
 }
 
-/** Reproducing what loadMVS() did in the MVS function to try and get geometry drawn. */
+/** Reproducing what loadMVS() did in the MVS function to try and get geometry drawn.
 async function loadMVSClone(plugin: PluginContext, data: KinemageData) {
   // This calls loadMolstartTree() after converting input data to a different format, parameter 'tree'\
   // This calls loadTree(), passing it MolstartLoadingActions function as a parameter; loadTree() is from load-generic.ts
@@ -187,6 +184,18 @@ async function loadMVSClone(plugin: PluginContext, data: KinemageData) {
   //    Here is what it sets:
   //      readonly mvsDependencyRefs: Set<string>
 }
+*/
+
+// pseudo: a minimal transform that creates a node containing the shapeProvider
+const KinemageDataCreateTransform = {
+  id: 'kinemage.data.create',
+  apply: (updateTarget: UpdateTarget, params: { data: ShapeProvider<KinData, Lines, KinShapeParams>, label?: string }) => {
+    // minimal holder transform: create a child node storing the ShapeProvider in state.
+    // Use an existing state transformer if available; this is just the type fix.
+    // Implementation omitted here — return an UpdateTarget created by applying a real transform.
+    return updateTarget;
+  }
+};
 
 /** DragAndDropHandler handler for `.kin` files */
 const KINDragAndDropHandler: DragAndDropHandler = {
@@ -208,6 +217,31 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           }
           console.log('XXX accumulated Kinemages size ', g_kinemageInfo.kinemages.length, ', active is ', g_kinemageInfo.activeKinemage);
           /// @todo See what loadMVS() ... LoadMolstarTree() ... MolstarLoadingActions().primitives() ... applyPrimitiveVisuals() does
+
+          // Build a ShapeProvider from the KinemageData
+          // The ShapeProvider can then be used in a Representation to display the geometry
+          // Alternatively, we may need to build a custom Representation that knows how to get the Shape from the KinemageData
+          // This is similar to how the KinRepresentationProvider works.
+          const spTask = shapeFromKin(g_kinemageInfo.kinemages[g_kinemageInfo.activeKinemage], {});
+          const shapeProvider = await spTask.runInContext(ctx) as ShapeProvider<KinData, Lines, KinShapeParams>;
+
+          console.log('XXX created ShapeProvider from KinemageData');
+          // Build an update target and apply the representation transform
+          const updateRoot = UpdateTarget.create(plugin, /* ReplaceExisting @todo consider using true here */ false);
+
+          // apply the transform; UpdateTarget.apply will schedule the transformer for this update
+          console.log('XXX applying StructureRepresentation3D with KinRepresentationProvider');
+          const holderTarget = UpdateTarget.apply(updateRoot, KinemageDataCreateTransform as any, { data: shapeProvider });
+          UpdateTarget.apply(holderTarget, StructureRepresentation3D as any, {
+            type: KinRepresentationProvider,
+            params: PD.getDefaultValues(g_kinemageInfo.kinemages[g_kinemageInfo.activeKinemage] as any),
+            data: shapeProvider
+          });
+
+          // commit the update -> this will cause Mol* to call the provider factory
+          console.log('XXX committing update target');
+          await UpdateTarget.commit(updateRoot);
+
         });
         await plugin.runTask(task);
         applied = true;
