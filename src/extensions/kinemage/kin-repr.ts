@@ -75,6 +75,7 @@ export const KinRepresentationProvider = StructureRepresentationProvider({
             state: Representation.createState ? Representation.createState() : (Representation as any).Empty.state,
             createOrUpdate: (props: any = {}, data?: ShapeProvider<any, Lines, any>) => {
                 return Task.create(`Kinemage lines createOrUpdate`, async runtime => {
+                    console.log('XXX KinRepresentationProvider.wrapper.createOrUpdate started');
                     // Prefer using a ShapeProvider if the caller passed one
                     let provider: any = undefined;
                     if (data && (data as any).getShape) {
@@ -115,6 +116,7 @@ export const KinRepresentationProvider = StructureRepresentationProvider({
                     if (innerRepr) await innerRepr.createOrUpdate(props, currentRenderObject).runInContext(runtime);
 
                     wrapper.updated.next((Date.now() % 1000000));
+                    console.log('XXX KinRepresentationProvider.wrapper.createOrUpdate completed');
                 });
             },
             setState: (s: any) => { if (innerRepr) innerRepr.setState(s); Representation.updateState(wrapper.state as any, s); },

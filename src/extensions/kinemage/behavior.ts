@@ -28,7 +28,6 @@ import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/rep
 import { ShapeProvider } from '../../mol-model/shape/provider';
 import { Lines } from '../../mol-geo/geometry/lines/lines';
 import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
-//import { StateTransformer } from '../../mol-state';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -188,29 +187,6 @@ async function loadMVSClone(plugin: PluginContext, data: KinemageData) {
 }
 */
 
-/** Minimal holder transform descriptor — must include `isDecorator`. */
-/*
-const KinemageDataCreateTransform = {
-  id: 'kinemage.data.create',
-  display: { name: 'Create Kinemage Data' },
-
-  // 'action' provides the state builder (action.update / action.selector)
-  apply: (action: any, params: { data?: any, label?: string }) => {
-    // Reuse existing transformer to create a real child structure node.
-    const created = action.update.to(action.selector).apply(
-      StructureFromModel as any,
-      { type: { name: 'model', params: {} } }
-    );
-    return created.selector;
-  },
-
-  // this transform decorates existing state rather than replacing it
-  isDecorator: true,
-  // @todo Check if this should be true or false
-  isOptional: true
-} as unknown as StateTransformer;
-*/
-
 // Provide minimal params getter for Kinemage shapes.
 // Return params based on the currently active kinemage when available,
 // otherwise fall back to the generic KinShapeParams.
@@ -255,23 +231,35 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           console.log('XXX UpdateTarget.create()');
           // Build an update target and apply the representation transform
           const updateRoot = UpdateTarget.create(plugin, false);
-          const structureTarget = UpdateTarget.apply(updateRoot, StructureFromModel as any, { type: { name: 'model', params: {} } });
-          console.log('XXX updateRoot.selector', updateRoot.selector);
-          console.log('XXX structureTarget.selector', (structureTarget as any).selector);
+          // Create an empty structure node using the registered transformer.
+          // Use UpdateTarget.apply so the returned value is a proper UpdateTarget and
+          // is already tracked in updateRoot.targetManager.allTargets.
+          const holderTarget = UpdateTarget.apply(updateRoot, StructureFromModel as any, { type: { name: 'model', params: {} } });
+
+          if (!holderTarget || !holderTarget.selector || !holderTarget.selector.ref) {
+            throw new Error('StructureFromModel did not create a child selector; aborting');
+          }
 
           console.log('XXX UpdateTarget.apply()');
           // attach the Kinemage representation to the created structure node
-          UpdateTarget.apply(structureTarget, StructureRepresentation3D as any, {
-            type: KinRepresentationProvider,
-            params: PD.getDefaultValues(getKinShapeParams() as any),
-            data: shapeProvider
-          });
+          UpdateTarget.apply(holderTarget, StructureRepresentation3D as any, {
+             type: KinRepresentationProvider,
+             params: PD.getDefaultValues(getKinShapeParams() as any),
+             data: shapeProvider
+           });
 
-          const tree = updateRoot.update.getTree();
-          console.log('XXX tree root children:', tree.children.get(updateRoot.selector.ref));
-          console.log('XXX UpdateTarget.commit()');
-          await UpdateTarget.commit(updateRoot); // commit once
-          console.log('XXX After UpdateTarget.commit()');
+          // Optional: verify every target has a visible entry in the pre-commit tree
+          const preTree = updateRoot.update.getTree();
+          for (const t of updateRoot.targetManager.allTargets) {
+            const has = preTree.children.has(t.selector.ref) || t.selector.ref === updateRoot.selector.ref;
+            if (!has) console.warn('XXX target selector not present in tree.children before commit:', t.selector.ref);
+          }
+
+           const tree = updateRoot.update.getTree();
+           console.log('XXX tree root children:', tree.children.get(updateRoot.selector.ref));
+           console.log('XXX UpdateTarget.commit()');
+           await UpdateTarget.commit(updateRoot); // commit once
+           console.log('XXX After UpdateTarget.commit()');
         });
         await plugin.runTask(task);
         applied = true;
