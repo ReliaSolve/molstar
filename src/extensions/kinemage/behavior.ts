@@ -7,6 +7,7 @@
  */
 
 //import { KinemageData } from '../../mol-io/reader/kin/schema';
+import { StateTransforms } from '../../mol-plugin-state/transforms';
 import { CustomModelProperty } from '../../mol-model-props/common/custom-model-property';
 import { CustomStructureProperty } from '../../mol-model-props/common/custom-structure-property';
 import { DataFormatProvider } from '../../mol-plugin-state/formats/provider';
@@ -23,11 +24,14 @@ import { ParamDefinition as PD } from '../../mol-util/param-definition';
 import { KinRepresentationProvider } from './kin-repr';
 import { KinemageInfo } from './prop';
 import { shapeFromKin, KinData, KinShapeParams, createKinShapeParams } from '../../mol-model-formats/shape/kin';
-import { UpdateTarget } from '../mvs/load-generic';
-import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
+//import { UpdateTarget } from '../mvs/load-generic';
+//import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
 import { ShapeProvider } from '../../mol-model/shape/provider';
 import { Lines } from '../../mol-geo/geometry/lines/lines';
-import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
+//import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
+import { PluginStateObject as SO } from '../../mol-plugin-state/objects';
+import { PluginStateTransform } from '../../mol-plugin-state/transforms';
+//import { IsKinModelProvider } from './components/is-kin-model-prop';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -55,7 +59,7 @@ export const Kinemage = PluginBehavior.create<{ autoAttach: boolean }>({
   ctor: class extends PluginBehavior.Handler<{ autoAttach: boolean }> {
     private readonly registerables: Registerables = {
       customModelProperties: [
-        //IsMVSModelProvider,
+        //IsKinModelProvider,
         //MVSAnnotationsProvider,
       ],
       customStructureProperties: [
@@ -200,6 +204,29 @@ function getKinShapeParams(): PD.Params {
   return PD.clone(KinShapeParams as any);
 }
 
+// Inline runtime transformer implemented via PluginStateTransform.BuiltIn so builder/runtime accept it.
+// Explicitly type `apply` parameters so `params` is not implicitly `any`.
+const RuntimeShapeProviderTransform: any = PluginStateTransform.BuiltIn({
+  name: 'kin.shape.from-runtime',
+  display: { name: 'Kinemage (runtime shape provider)' },
+  from: SO.Root,
+  to: SO.Shape.Provider,
+  params: (a?: any) => ({
+    provider: PD.Value<ShapeProvider<KinData, Lines, KinShapeParams> | undefined>(void 0, { isHidden: true })
+  })
+})({
+  isApplicable: () => true,
+  apply({ a, params }: { a: any, params: { provider?: ShapeProvider<KinData, Lines, KinShapeParams> } }) {
+    return Task.create('Create runtime shape provider', async ctx => {
+      const provider = params.provider;
+      if (!provider) throw new Error('RuntimeShapeProviderTransform: required parameter "provider" is missing');
+      const props = { label: provider.label || 'Kinemage Shape' };
+      // cast to any to satisfy runtime constructor shape if necessary
+      return new SO.Shape.Provider(provider as any, props);
+    });
+  }
+});
+
 /** DragAndDropHandler handler for `.kin` files */
 const KINDragAndDropHandler: DragAndDropHandler = {
   name: 'kin',
@@ -228,38 +255,25 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           const spTask = shapeFromKin(g_kinemageInfo.kinemages[g_kinemageInfo.activeKinemage], {});
           const shapeProvider = await spTask.runInContext(ctx) as ShapeProvider<KinData, Lines, KinShapeParams>;
 
-          console.log('XXX UpdateTarget.create()');
-          // Build an update target and apply the representation transform
-          const updateRoot = UpdateTarget.create(plugin, false);
-          // Create an empty structure node using the registered transformer.
-          // Use UpdateTarget.apply so the returned value is a proper UpdateTarget and
-          // is already tracked in updateRoot.targetManager.allTargets.
-          const holderTarget = UpdateTarget.apply(updateRoot, StructureFromModel as any, { type: { name: 'model', params: {} } });
+          console.log('XXX create shape state node from runtime provider');
 
-          if (!holderTarget || !holderTarget.selector || !holderTarget.selector.ref) {
-            throw new Error('StructureFromModel did not create a child selector; aborting');
-          }
+          // Use a transient builder, apply the inline transformer that creates an SO.Shape.Provider
+          const builder = plugin.state.data.build();
+          const action = builder.toRoot(); // action that has .apply() / .to(...)
+          const shapeNode = action.apply(RuntimeShapeProviderTransform as any, { provider: shapeProvider });
 
-          console.log('XXX UpdateTarget.apply()');
-          // attach the Kinemage representation to the created structure node
-          UpdateTarget.apply(holderTarget, StructureRepresentation3D as any, {
-             type: KinRepresentationProvider,
-             params: PD.getDefaultValues(getKinShapeParams() as any),
-             data: shapeProvider
-           });
+          // Apply ShapeRepresentation3D to the created shape within the same builder action
+          // (avoids overload/type issues when calling .to(...) on a fresh builder)
+          action.to(shapeNode.selector.ref).apply(StateTransforms.Representation.ShapeRepresentation3D, {
+            params: PD.getDefaultValues(getKinShapeParams() as any)
+          });
 
-          // Optional: verify every target has a visible entry in the pre-commit tree
-          const preTree = updateRoot.update.getTree();
-          for (const t of updateRoot.targetManager.allTargets) {
-            const has = preTree.children.has(t.selector.ref) || t.selector.ref === updateRoot.selector.ref;
-            if (!has) console.warn('XXX target selector not present in tree.children before commit:', t.selector.ref);
-          }
+          // Commit once for both transforms
+          await builder.commit();
 
-           const tree = updateRoot.update.getTree();
-           console.log('XXX tree root children:', tree.children.get(updateRoot.selector.ref));
-           console.log('XXX UpdateTarget.commit()');
-           await UpdateTarget.commit(updateRoot); // commit once
-           console.log('XXX After UpdateTarget.commit()');
+          console.log('XXX created shape selector:', shapeNode.selector);
+          console.log('XXX ShapeRepresentation3D committed');
+
         });
         await plugin.runTask(task);
         applied = true;

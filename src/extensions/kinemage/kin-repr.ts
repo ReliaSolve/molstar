@@ -58,7 +58,7 @@ export const KinRepresentationProvider = StructureRepresentationProvider({
         // Implement using your Lines visual/render utilities.
         function createLinesRenderObject(webgl: WebGLContext | undefined, lines: Lines, props: PD.Values<PD.Params>): GraphicsRenderObject {
             /// @todo Implement using your Lines visual utilities
-            throw new Error('createLinesRenderObject() not implemented - implement using your Lines visual utilities');
+            throw new Error('XXX createLinesRenderObject() not implemented - implement using your Lines visual utilities');
         }
 
         // Representation that delegates to innerRepr if available
