@@ -24,7 +24,7 @@ import { ParamDefinition as PD } from '../../mol-util/param-definition';
 import { KinRepresentationProvider } from './kin-repr';
 import { KinemageInfo } from './prop';
 import { shapeFromKin, KinData, KinShapeParams, createKinShapeParams } from '../../mol-model-formats/shape/kin';
-import { UpdateTarget } from '../mvs/load-generic';
+//import { UpdateTarget } from '../mvs/load-generic';
 //import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
 import { ShapeProvider } from '../../mol-model/shape/provider';
 import { Lines } from '../../mol-geo/geometry/lines/lines';
@@ -261,8 +261,9 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           delete RuntimeProviderRegistry[shapeRef];
           */
 
+         /*
           // Create an update root and register a runtime shape provider, then attach a ShapeRepresentation3D
-          console.log('XXX create updateRoot');
+          console.log('XXX create updateRoot...');
           const updateRoot = UpdateTarget.create(plugin, false);
 
           // Register provider in runtime registry and create a provider node under Root.
@@ -278,6 +279,45 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           // commit all changes
           console.log('XXX commit updateRoot');
           await UpdateTarget.commit(updateRoot);
+
+          // cleanup registry entry (optional)
+          delete RuntimeProviderRegistry[shapeRef];
+          */
+
+          // Create a transient builder, register a runtime shape provider and attach a ShapeRepresentation3D.
+          // Using the transient builder (plugin.state.data.build()) to apply transforms mirrors the
+          // earlier commented-out approach and avoids the 'parent undefined' error we hit with UpdateTarget.apply.
+          /*
+          console.log('XXX build transient update');
+          const builder = plugin.state.data.build();
+          console.log('XXX toRoot');
+          const action = builder.toRoot();
+          */
+
+          // register provider in runtime registry and give it a unique ref
+          const shapeRef = `kin:${Date.now().toString(16)}:${Math.random().toString(36).slice(2, 8)}`;
+          RuntimeProviderRegistry[shapeRef] = shapeProvider;
+
+          // Apply provider transform in its own builder transaction so the provider node
+          // is guaranteed to exist in the state tree before attaching the representation.
+          console.log('XXX create provider node (builder #1)');
+          {
+            const builder1 = plugin.state.data.build();
+            const action1 = builder1.toRoot();
+            action1.apply(RuntimeShapeProviderTransform as any, { providerRef: shapeRef }, { ref: `!${shapeRef}` });
+            await builder1.commit();
+          }
+
+          // Now attach the representation in a separate transaction using the explicit ref.
+          console.log('XXX attach ShapeRepresentation3D (builder #2) to !' + shapeRef);
+          {
+            const builder2 = plugin.state.data.build();
+            const action2 = builder2.toRoot();
+            action2.to(`!${shapeRef}`).apply(ShapeRepresentation3D as any, {
+              params: PD.getDefaultValues(getKinShapeParams() as any)
+            });
+            await builder2.commit();
+          }
 
           // cleanup registry entry (optional)
           delete RuntimeProviderRegistry[shapeRef];

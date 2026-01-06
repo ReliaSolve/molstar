@@ -55,8 +55,13 @@ export const RuntimeShapeProviderTransform: any = {
   },
 
   // top-level apply delegates to definition.apply
-  apply(this: any, args: { a?: any, params?: any, cache?: any, spine?: any, dependencies?: any } | any) {
-    return (RuntimeShapeProviderTransform.definition.apply as any).call(this, args);
+  // Accept either the single-wrapper object or positional args (a, params, cache, ...)
+  apply(this: any, ...args: any[]) {
+    if (args.length > 1) {
+      const [a, params, cache, spine, dependencies] = args;
+      return (RuntimeShapeProviderTransform.definition.apply as any).call(this, { a, params, cache, spine, dependencies });
+    }
+    return (RuntimeShapeProviderTransform.definition.apply as any).call(this, args[0]);
   },
 
   // top-level metadata mirror
