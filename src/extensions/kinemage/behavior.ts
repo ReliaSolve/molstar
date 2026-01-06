@@ -7,7 +7,7 @@
  */
 
 //import { KinemageData } from '../../mol-io/reader/kin/schema';
-import { StateTransforms } from '../../mol-plugin-state/transforms';
+//import { StateTransforms } from '../../mol-plugin-state/transforms';
 import { CustomModelProperty } from '../../mol-model-props/common/custom-model-property';
 import { CustomStructureProperty } from '../../mol-model-props/common/custom-structure-property';
 import { DataFormatProvider } from '../../mol-plugin-state/formats/provider';
@@ -24,14 +24,15 @@ import { ParamDefinition as PD } from '../../mol-util/param-definition';
 import { KinRepresentationProvider } from './kin-repr';
 import { KinemageInfo } from './prop';
 import { shapeFromKin, KinData, KinShapeParams, createKinShapeParams } from '../../mol-model-formats/shape/kin';
-//import { UpdateTarget } from '../mvs/load-generic';
-//import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
+import { UpdateTarget } from '../mvs/load-generic';
+import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
 import { ShapeProvider } from '../../mol-model/shape/provider';
 import { Lines } from '../../mol-geo/geometry/lines/lines';
-//import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
-import { PluginStateObject as SO } from '../../mol-plugin-state/objects';
+//import { PluginStateObject as SO } from '../../mol-plugin-state/objects';
 //import { PluginStateTransform } from '../../mol-plugin-state/transforms';
 //import { IsKinModelProvider } from './components/is-kin-model-prop';
+//import { RuntimeShapeProviderTransform, RuntimeProviderRegistry } from './transforms/kinemage-shape-provider-transform';
+import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -204,51 +205,6 @@ function getKinShapeParams(): PD.Params {
   return PD.clone(KinShapeParams as any);
 }
 
-// Runtime shape-provider transformer (StateTransformer-shaped object).
-// Provide both `definition` and a top-level `apply` so StateBuilder action.apply(...) works.
-const RuntimeShapeProviderTransform: any = {
-  id: 'kin.shape.from-runtime',
-  display: { name: 'Kinemage (runtime shape provider)' },
-
-  definition: {
-    // params function must return ParamDefinition for proper normalization/resolution
-    params: (a?: any) => ({
-      provider: PD.Value<ShapeProvider<KinData, Lines, KinShapeParams> | undefined>(void 0, { isHidden: true }),
-      label: PD.Optional(PD.Text('', { isHidden: true }))
-    }),
-    // apply to root (empty array means "no ancestor type required")
-    from: [],
-    to: SO.Shape.Provider,
-    isDecorator: false,
-
-    // create the state object from runtime params
-    apply({ a, params }: { a: any, params: { provider?: ShapeProvider<KinData, Lines, KinShapeParams>, label?: string } }) {
-      return Task.create('Create runtime shape provider', async ctx => {
-        const provider = params.provider;
-        if (!provider) throw new Error('RuntimeShapeProviderTransform: required parameter "provider" is missing');
-        const props = { label: params.label || provider.label || 'Kinemage Shape' };
-        // return proper state object
-        return new SO.Shape.Provider(provider as any, props);
-      });
-    },
-
-    update: undefined,
-    dispose: undefined
-  },
-
-  // Builder expects transformer.apply(...) at top-level -> delegate to definition.apply
-  apply(this: any, args: { a?: any, params?: any, cache?: any, spine?: any, dependencies?: any }) {
-    // forward to definition.apply with same signature
-    return (RuntimeShapeProviderTransform.definition.apply as any).call(this, args);
-  },
-
-  // top-level metadata used by some code paths
-  // duplicate the definition metadata here as literals to avoid referencing the variable
-  isDecorator: false, /// @todo Check if correct
-  from: [],
-  to: SO.Shape.Provider
-};
-
 /** DragAndDropHandler handler for `.kin` files */
 const KINDragAndDropHandler: DragAndDropHandler = {
   name: 'kin',
@@ -271,37 +227,63 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           /// @todo See what loadMVS() ... LoadMolstarTree() ... MolstarLoadingActions().primitives() ... applyPrimitiveVisuals() does
 
           // Build a ShapeProvider from the KinemageData
-          // The ShapeProvider can then be used in a Representation to display the geometry
-          // Alternatively, we may need to build a custom Representation that knows how to get the Shape from the KinemageData
-          // This is similar to how the KinRepresentationProvider works.
           const spTask = shapeFromKin(g_kinemageInfo.kinemages[g_kinemageInfo.activeKinemage], {});
+          console.log('XXX runInContext');
           const shapeProvider = await spTask.runInContext(ctx) as ShapeProvider<KinData, Lines, KinShapeParams>;
 
-          console.log('XXX create shape state node from runtime provider');
-
-          // Use a transient builder, apply the inline transformer that creates an SO.Shape.Provider
+          /*
+          // Use transient builder, apply the runtime transform that creates an SO.Shape.Provider
+          console.log('XXX build');
           const builder = plugin.state.data.build();
-          const action = builder.toRoot(); // action that has .apply() / .to(...)
+          console.log('XXX toRoot');
+          const action = builder.toRoot();
 
-          // create a deterministic unique ref for the new shape node so parent is never undefined
-          const shapeRef = `!kin:${Date.now().toString(16)}`;
+          // create a unique ref and register the provider in module registry
+          const shapeRef = `kin:${Date.now().toString(16)}:${Math.random().toString(36).slice(2, 8)}`;
+          console.log('XXX shapeRef=', shapeRef);
+          RuntimeProviderRegistry[shapeRef] = shapeProvider;
 
-          // apply the runtime transform and request the explicit ref (third arg = options)
-          // We don't rely on the returned action.selector (it may not be present); use the explicit ref we created.
-          action.apply(RuntimeShapeProviderTransform as any, { provider: shapeProvider }, { ref: shapeRef });
+          // apply transform using providerRef (serializable) and request explicit node ref
+          console.log('XXX apply RuntimeShapeProviderTransform');
+          action.apply(RuntimeShapeProviderTransform as any, { providerRef: shapeRef }, { ref: `!${shapeRef}` });
 
-          // attach a ShapeRepresentation3D to the explicit shape ref
-          action.to(shapeRef).apply(StateTransforms.Representation.ShapeRepresentation3D, {
+          // attach ShapeRepresentation3D to the created shape node (use same explicit ref)
+          console.log('XXX apply ShapeRepresentation3D');
+          action.to(`!${shapeRef}`).apply(StateTransforms.Representation.ShapeRepresentation3D, {
             params: PD.getDefaultValues(getKinShapeParams() as any)
           });
 
-          // Commit once for both transforms
+          // commit once for both transforms
           await builder.commit();
 
-          console.log('XXX created shape selector:', shapeRef);
-          console.log('XXX ShapeRepresentation3D committed');
+          // cleanup registry if desired (optional)
+          delete RuntimeProviderRegistry[shapeRef];
+          */
 
+          // Create an update root and a minimal structure node, then attach a ShapeRepresentation3D
+          console.log('XXX create updateRoot');
+          const updateRoot = UpdateTarget.create(plugin, false);
+
+          // create an empty structure node (same pattern used by built-in loaders)
+          console.log('XXX create holderTarget');
+          const holderTarget = UpdateTarget.apply(updateRoot, StructureFromModel as any, { type: { name: 'model', params: {} } });
+          if (!holderTarget || !holderTarget.selector || !holderTarget.selector.ref) {
+            throw new Error('StructureFromModel did not create a child selector; aborting');
+          }
+
+          // attach the shape representation using the runtime shapeProvider as `data`
+          console.log('XXX apply UpdateTarget');
+          UpdateTarget.apply(holderTarget, StructureRepresentation3D as any, {
+            type: KinRepresentationProvider,
+            params: PD.getDefaultValues(getKinShapeParams() as any),
+            data: shapeProvider
+          });
+
+          // commit all changes
+          console.log('XXX commit updateRoot');
+          await UpdateTarget.commit(updateRoot);
         });
+        console.log('XXX plugin.runTask');
         await plugin.runTask(task);
         applied = true;
       }
