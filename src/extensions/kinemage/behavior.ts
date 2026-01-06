@@ -25,14 +25,15 @@ import { KinRepresentationProvider } from './kin-repr';
 import { KinemageInfo } from './prop';
 import { shapeFromKin, KinData, KinShapeParams, createKinShapeParams } from '../../mol-model-formats/shape/kin';
 import { UpdateTarget } from '../mvs/load-generic';
-import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
+//import { StructureFromModel } from '../../mol-plugin-state/transforms/model'; // add near other imports
 import { ShapeProvider } from '../../mol-model/shape/provider';
 import { Lines } from '../../mol-geo/geometry/lines/lines';
 //import { PluginStateObject as SO } from '../../mol-plugin-state/objects';
 //import { PluginStateTransform } from '../../mol-plugin-state/transforms';
 //import { IsKinModelProvider } from './components/is-kin-model-prop';
 //import { RuntimeShapeProviderTransform, RuntimeProviderRegistry } from './transforms/kinemage-shape-provider-transform';
-import { StructureRepresentation3D } from '../../mol-plugin-state/transforms/representation';
+import { ShapeRepresentation3D } from '../../mol-plugin-state/transforms/representation';
+import { RuntimeShapeProviderTransform, RuntimeProviderRegistry } from './transforms/kinemage-shape-provider-transform';
 
 /** Global KinemageInfo that is used to display */
 let g_kinemageInfo: KinemageInfo = {kinemages: [], activeKinemage: -1};
@@ -260,28 +261,26 @@ const KINDragAndDropHandler: DragAndDropHandler = {
           delete RuntimeProviderRegistry[shapeRef];
           */
 
-          // Create an update root and a minimal structure node, then attach a ShapeRepresentation3D
+          // Create an update root and register a runtime shape provider, then attach a ShapeRepresentation3D
           console.log('XXX create updateRoot');
           const updateRoot = UpdateTarget.create(plugin, false);
 
-          // create an empty structure node (same pattern used by built-in loaders)
-          console.log('XXX create holderTarget');
-          const holderTarget = UpdateTarget.apply(updateRoot, StructureFromModel as any, { type: { name: 'model', params: {} } });
-          if (!holderTarget || !holderTarget.selector || !holderTarget.selector.ref) {
-            throw new Error('StructureFromModel did not create a child selector; aborting');
-          }
+          // Register provider in runtime registry and create a provider node under Root.
+          const shapeRef = `kin:${Date.now().toString(16)}:${Math.random().toString(36).slice(2, 8)}`;
+          RuntimeProviderRegistry[shapeRef] = shapeProvider;
+          const providerTarget = UpdateTarget.apply(updateRoot, RuntimeShapeProviderTransform as any, { providerRef: shapeRef }, { ref: `!${shapeRef}` });
 
-          // attach the shape representation using the runtime shapeProvider as `data`
-          console.log('XXX apply UpdateTarget');
-          UpdateTarget.apply(holderTarget, StructureRepresentation3D as any, {
-            type: KinRepresentationProvider,
-            params: PD.getDefaultValues(getKinShapeParams() as any),
-            data: shapeProvider
+          // Attach a ShapeRepresentation3D to the runtime provider node.
+          UpdateTarget.apply(providerTarget, ShapeRepresentation3D as any, {
+            params: PD.getDefaultValues(getKinShapeParams() as any)
           });
 
           // commit all changes
           console.log('XXX commit updateRoot');
           await UpdateTarget.commit(updateRoot);
+
+          // cleanup registry entry (optional)
+          delete RuntimeProviderRegistry[shapeRef];
         });
         console.log('XXX plugin.runTask');
         await plugin.runTask(task);
