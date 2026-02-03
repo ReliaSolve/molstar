@@ -8,6 +8,7 @@
  */
 
 import { ANVILMembraneOrientation } from '../../extensions/anvil/behavior';
+import { KinemageExtension } from '../../extensions/kinemage/behavior';
 import { Backgrounds } from '../../extensions/backgrounds';
 import { DnatcoNtCs } from '../../extensions/dnatco';
 import { G3DFormat, G3dProvider } from '../../extensions/g3d/format';
@@ -84,6 +85,7 @@ export const ExtensionMap = {
     'wwpdb-chemical-component-dictionary': PluginSpec.Behavior(wwPDBChemicalComponentDictionary),
     'mvs': PluginSpec.Behavior(MolViewSpec),
     'tunnels': PluginSpec.Behavior(SbNcbrTunnels),
+    'kinemage': PluginSpec.Behavior(KinemageExtension),
 };
 
 const DefaultViewerOptions = {
